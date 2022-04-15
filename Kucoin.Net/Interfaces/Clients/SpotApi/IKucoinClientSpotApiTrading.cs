@@ -358,5 +358,19 @@ namespace Kucoin.Net.Interfaces.Clients.SpotApi
             string tradeId,
             decimal quantity,
             CancellationToken ct = default);
+
+        /// <summary>
+        /// Get borrow outstanding records (https://docs.kucoin.com/#get-repay-record)
+        /// </summary>
+        /// <param name="asset">Currency</param>
+        /// <param name="currentPage">Current page</param>
+        /// <param name="pageSize">Page size</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Paginated outstanding borrows</returns>
+        Task<WebCallResult<KucoinPaginated<KucoinBorrowUnrepaid>>> GetUnrepaidBorrowsAsync(
+            string? asset = null, 
+            int? currentPage = null, 
+            int? pageSize = null, 
+            CancellationToken ct = default);
     }
 }

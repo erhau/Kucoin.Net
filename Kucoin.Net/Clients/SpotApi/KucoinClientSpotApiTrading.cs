@@ -430,5 +430,18 @@ namespace Kucoin.Net.Clients.SpotApi
 
             return await _baseClient.Execute(_baseClient.GetUri("margin/repay/single"), HttpMethod.Post, ct, parameters, true).ConfigureAwait(false);
         }
+
+        /// <inheritdoc/>
+        public async Task<WebCallResult<KucoinPaginated<KucoinBorrowUnrepaid>>> GetUnrepaidBorrowsAsync(string? asset = null, int? currentPage = null, int? pageSize = null, CancellationToken ct = default)
+        {
+            pageSize?.ValidateIntBetween(nameof(pageSize), 10, 100);
+
+            var parameters = new Dictionary<string, object>();
+            parameters.AddOptionalParameter("currency", asset);
+            parameters.AddOptionalParameter("currentPage", currentPage);
+            parameters.AddOptionalParameter("pageSize", pageSize);
+
+            return await _baseClient.Execute<KucoinPaginated<KucoinBorrowUnrepaid>>(_baseClient.GetUri("margin/borrow/outstanding"), HttpMethod.Get, ct, parameters, true).ConfigureAwait(false);
+        }
     }
 }

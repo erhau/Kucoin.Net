@@ -545,6 +545,9 @@
         <member name="M:Kucoin.Net.Clients.SpotApi.KucoinClientSpotApiTrading.RepaySingleBorrowOrderAsync(System.String,System.String,System.Decimal,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Kucoin.Net.Clients.SpotApi.KucoinClientSpotApiTrading.GetUnrepaidBorrowsAsync(System.String,System.Nullable{System.Int32},System.Nullable{System.Int32},System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
         <member name="T:Kucoin.Net.Clients.SpotApi.KucoinSocketClientSpotStreams">
             <inheritdoc cref="T:Kucoin.Net.Interfaces.Clients.SpotApi.IKucoinSocketClientSpotStreams" />
         </member>
@@ -2887,6 +2890,16 @@
             <param name="quantity">Repayment size</param>
             <param name="ct">Cancellation token</param>
             <returns></returns>
+        </member>
+        <member name="M:Kucoin.Net.Interfaces.Clients.SpotApi.IKucoinClientSpotApiTrading.GetUnrepaidBorrowsAsync(System.String,System.Nullable{System.Int32},System.Nullable{System.Int32},System.Threading.CancellationToken)">
+            <summary>
+            Get borrow outstanding records (https://docs.kucoin.com/#get-repay-record)
+            </summary>
+            <param name="asset">Currency</param>
+            <param name="currentPage">Current page</param>
+            <param name="pageSize">Page size</param>
+            <param name="ct">Cancellation token</param>
+            <returns>Paginated outstanding borrows</returns>
         </member>
         <member name="T:Kucoin.Net.Interfaces.Clients.SpotApi.IKucoinSocketClientSpotStreams">
             <summary>
@@ -5767,6 +5780,61 @@
         <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowOrderDetails.TradeId">
             <summary>
             The trade id of the borrow order
+            </summary>
+        </member>
+        <member name="T:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid">
+            <summary>
+            Borrow outstanding record
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.TradeId">
+            <summary>
+            Trade ID
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.Asset">
+            <summary>
+            Currency
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.Liabilities">
+            <summary>
+            Total liabilities
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.Principal">
+            <summary>
+            Principal
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.Interests">
+            <summary>
+            Accrued interest
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.Term">
+            <summary>
+            Term
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.Repaid">
+            <summary>
+            Repaid size
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.DailyInterestRate">
+            <summary>
+            Daily interest rate
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.CreatedAt">
+            <summary>
+            Execution time
+            </summary>
+        </member>
+        <member name="P:Kucoin.Net.Objects.Models.Spot.KucoinBorrowUnrepaid.MaturityTime">
+            <summary>
+            Maturity time
             </summary>
         </member>
         <member name="T:Kucoin.Net.Objects.Models.Spot.KucoinCanceledOrder">
