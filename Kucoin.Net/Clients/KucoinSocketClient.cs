@@ -46,8 +46,6 @@ namespace Kucoin.Net.Clients
         /// <param name="options">The options to use for this client</param>
         public KucoinSocketClient(KucoinSocketClientOptions options) : base("Kucoin", options)
         {
-            MaxSocketConnections = 10;
-
             SendPeriodic("Ping", TimeSpan.FromSeconds(30), (connection) => new KucoinPing()
             {
                 Id = Math.Round((DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalMilliseconds).ToString(CultureInfo.InvariantCulture),
@@ -70,6 +68,10 @@ namespace Kucoin.Net.Clients
             KucoinSocketClientOptions.Default = options;
         }
 
+        /// <summary>
+        /// Set the API credentials to use in this client
+        /// </summary>
+        /// <param name="credentials">Credentials to use</param>
         public void SetApiCredentials(KucoinApiCredentials credentials)
         {
             ((KucoinSocketClientSpotStreams)SpotStreams).SetApiCredentials(credentials);
@@ -83,152 +85,54 @@ namespace Kucoin.Net.Clients
             => SubscribeAsync(apiClient, request, identifier, authenticated, dataHandler, ct);
 
         /// <inheritdoc />
-        protected override async Task<CallResult<UpdateSubscription>> SubscribeAsync<T>(SocketApiClient apiClient, string url, object? request, string? identifier, bool authenticated, Action<DataEvent<T>> dataHandler, CancellationToken ct)
+        protected override async Task<CallResult<string?>> GetConnectionUrlAsync(SocketApiClient apiClient, string address, bool authenticated)
         {
-            SocketConnection? socketConnection;
-            SocketSubscription subscription;
-            var released = false;
-            try
+            var clientOptions = new KucoinClientOptions(KucoinClientOptions.Default);
+            KucoinApiCredentials? thisCredentials = (KucoinApiCredentials?)apiClient.AuthenticationProvider?.Credentials;
+            if (apiClient is KucoinSocketClientSpotStreams)
             {
-                await semaphoreSlim.WaitAsync(ct).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                return new CallResult<UpdateSubscription>(new CancellationRequestedError());
-            }
-
-            try
-            {
-                socketConnection = GetSocketConnection(apiClient, url, authenticated);
-                if (socketConnection == null)
+                if (thisCredentials != null)
                 {
-                    var clientOptions = new KucoinClientOptions();
-                    KucoinApiCredentials? thisCredentials = (KucoinApiCredentials?)apiClient.AuthenticationProvider?.Credentials;
-
-                    // Create new socket
-                    IWebsocket socket;
-                    if (SocketFactory is WebsocketFactory)
-                    {
-                        KucoinToken token;
-                        
-                        if (url == "futures")
-                        {
-                            if (thisCredentials != null)
-                            {
-                                clientOptions.FuturesApiOptions.ApiCredentials = new KucoinApiCredentials(thisCredentials.Key!.GetString(),
-                                    thisCredentials.Secret!.GetString(), thisCredentials.PassPhrase.GetString());
-                            }
-
-                            using (var restClient = new KucoinClient(clientOptions))
-                            {
-                                WebCallResult<KucoinToken> tokenResult = await ((KucoinClientFuturesApiAccount)restClient.FuturesApi.Account).GetWebsocketToken(authenticated, ct).ConfigureAwait(false);
-                                if (!tokenResult)
-                                {
-                                    log.Write(LogLevel.Warning, $"Failed to connect new socket, couldn't request websocket url: " + tokenResult.Error);
-                                    return new CallResult<UpdateSubscription>(tokenResult.Error!);
-                                }
-
-                                token = tokenResult.Data;
-                            }
-                        }
-                        else
-                        {
-                            if (thisCredentials != null)
-                            {
-                                clientOptions.SpotApiOptions.ApiCredentials = new KucoinApiCredentials(thisCredentials.Key!.GetString(),
-                                    thisCredentials.Secret!.GetString(), thisCredentials.PassPhrase.GetString());
-                            }
-
-                            using (var restClient = new KucoinClient(clientOptions))
-                            {
-                                WebCallResult<KucoinToken> tokenResult = await ((KucoinClientSpotApiAccount)restClient.SpotApi.Account).GetWebsocketToken(authenticated, ct).ConfigureAwait(false);
-                                if (!tokenResult)
-                                {
-                                    log.Write(LogLevel.Warning, $"Failed to connect new socket, couldn't request websocket url: " + tokenResult.Error);
-                                    return new CallResult<UpdateSubscription>(tokenResult.Error!);
-                                }
-
-                                token = tokenResult.Data;
-                            }
-                        }
-                        
-
-                        socket = CreateSocket(token.Servers.First().Endpoint + "?token=" + token.Token);
-                    }
-                    else
-                        socket = CreateSocket("test");
-
-                    socketConnection = new SocketConnection(this, apiClient, socket);
-                    socketConnection.Tag = url;
-                    foreach (var kvp in genericHandlers)
-                        socketConnection.AddSubscription(SocketSubscription.CreateForIdentifier(NextId(), kvp.Key, false, kvp.Value));
+                    clientOptions.SpotApiOptions.ApiCredentials = new KucoinApiCredentials(thisCredentials.Key!.GetString(),
+                        thisCredentials.Secret!.GetString(), thisCredentials.PassPhrase.GetString());
                 }
 
-                subscription = AddSubscription(request, identifier, true, socketConnection, dataHandler);
-                if (ClientOptions.SocketSubscriptionsCombineTarget == 1)
+                using (var restClient = new KucoinClient(clientOptions))
                 {
-                    // Can release early when only a single sub per connection
-                    semaphoreSlim.Release();
-                    released = true;
+                    WebCallResult<KucoinToken> tokenResult = await ((KucoinClientSpotApiAccount)restClient.SpotApi.Account).GetWebsocketToken(authenticated).ConfigureAwait(false);
+                    if (!tokenResult)
+                        return tokenResult.As<string?>(null);                    
+
+                    return new CallResult<string?>(tokenResult.Data.Servers.First().Endpoint + "?token=" + tokenResult.Data.Token);
                 }
-
-                var connectResult = await ConnectIfNeededAsync(socketConnection, authenticated).ConfigureAwait(false);
-                if (!connectResult)
-                    return new CallResult<UpdateSubscription>(connectResult.Error!);
-            }
-            finally
-            {
-                //When the task is ready, release the semaphore. It is vital to ALWAYS release the semaphore when we are ready, or else we will end up with a Semaphore that is forever locked.
-                //This is why it is important to do the Release within a try...finally clause; program execution may crash or take a different path, this way you are guaranteed execution
-                if (!released)
-                    semaphoreSlim.Release();
-            }
-
-
-            if (request != null)
-            {
-                var subResult = await SubscribeAndWaitAsync(socketConnection, request, subscription).ConfigureAwait(false);
-                if (!subResult)
-                {
-                    await socketConnection.CloseAsync(subscription).ConfigureAwait(false);
-                    return new CallResult<UpdateSubscription>(subResult.Error!);
-                }
-
             }
             else
             {
-                subscription.Confirmed = true;
-            }
-
-            socketConnection.ShouldReconnect = true;
-            if (ct != default)
-            {
-                subscription.CancellationTokenRegistration = ct.Register(async () =>
+                if (thisCredentials != null)
                 {
-                    log.Write(LogLevel.Debug, $"Socket {socketConnection.Socket.Id} Cancellation token set, closing subscription");
-                    await socketConnection.CloseAsync(subscription).ConfigureAwait(false);
-                }, false);
+                    clientOptions.FuturesApiOptions.ApiCredentials = new KucoinApiCredentials(thisCredentials.Key!.GetString(),
+                        thisCredentials.Secret!.GetString(), thisCredentials.PassPhrase.GetString());
+                }
+
+                using (var restClient = new KucoinClient(clientOptions))
+                {
+                    WebCallResult<KucoinToken> tokenResult = await ((KucoinClientFuturesApiAccount)restClient.FuturesApi.Account).GetWebsocketToken(authenticated).ConfigureAwait(false);
+                    if (!tokenResult)
+                        return tokenResult.As<string?>(null);
+
+                    return new CallResult<string?>(tokenResult.Data.Servers.First().Endpoint + "?token=" + tokenResult.Data.Token);
+                }
             }
-            return new CallResult<UpdateSubscription>(new UpdateSubscription(socketConnection, subscription));
         }
 
         /// <inheritdoc />
-        protected override SocketConnection GetSocketConnection(SocketApiClient apiClient, string address, bool authenticated)
+        public override async Task<Uri?> GetReconnectUriAsync(SocketApiClient apiClient, SocketConnection connection)
         {
-            var socketResult = sockets.Where(s => s.Value.Tag == address
-                                                 && s.Value.ApiClient.GetType() == apiClient.GetType()
-                                                 && (s.Value.Authenticated == authenticated || !authenticated) && s.Value.Connected).OrderBy(s => s.Value.SubscriptionCount).FirstOrDefault();
-            var result = socketResult.Equals(default(KeyValuePair<int, SocketConnection>)) ? null : socketResult.Value;
-            if (result != null)
-            {
-                if (result.SubscriptionCount < ClientOptions.SocketSubscriptionsCombineTarget || sockets.Count >= MaxSocketConnections && sockets.All(s => s.Value.SubscriptionCount >= ClientOptions.SocketSubscriptionsCombineTarget))
-                {
-                    // Use existing socket if it has less than target connections OR it has the least connections and we can't make new
-                    return result;
-                }
-            }
+            var result = await GetConnectionUrlAsync(apiClient, connection.ConnectionUri.ToString(), connection.Subscriptions.Any(s => s.Authenticated)).ConfigureAwait(false);
+            if (!result)
+                return null;
 
-            return null!;
+            return new Uri(result.Data);
         }
 
         /// <inheritdoc />

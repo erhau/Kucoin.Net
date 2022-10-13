@@ -57,6 +57,8 @@ namespace Kucoin.Net.Clients.SpotApi
             Account = new KucoinClientSpotApiAccount(this);
             ExchangeData = new KucoinClientSpotApiExchangeData(this);
             Trading = new KucoinClientSpotApiTrading(this);
+
+            ParameterPositions[HttpMethod.Delete] = HttpMethodParameterPosition.InUri;
         }
 
         /// <inheritdoc />
@@ -85,7 +87,7 @@ namespace Kucoin.Net.Clients.SpotApi
                 Name = d.Symbol,
                 MinTradeQuantity = d.BaseMinQuantity,
                 PriceStep = d.PriceIncrement,
-                QuantityStep = d.QuoteIncrement
+                QuantityStep = d.BaseIncrement
             }));
         }
 
@@ -152,7 +154,7 @@ namespace Kucoin.Net.Clients.SpotApi
 
         async Task<WebCallResult<OrderBook>> IBaseRestClient.GetOrderBookAsync(string symbol, CancellationToken ct)
         {
-            var book = await ExchangeData.GetOrderBookAsync(symbol, ct: ct).ConfigureAwait(false);
+            var book = await ExchangeData.GetAggregatedFullOrderBookAsync(symbol, ct: ct).ConfigureAwait(false);
             if (!book)
                 return book.As<OrderBook>(null);
 
@@ -317,7 +319,7 @@ namespace Kucoin.Net.Clients.SpotApi
         {
             if (timeSpan == TimeSpan.FromMinutes(1)) return KlineInterval.OneMinute;
             if (timeSpan == TimeSpan.FromMinutes(5)) return KlineInterval.FiveMinutes;
-            if (timeSpan == TimeSpan.FromMinutes(15)) return KlineInterval.FiveMinutes;
+            if (timeSpan == TimeSpan.FromMinutes(15)) return KlineInterval.FifteenMinutes;
             if (timeSpan == TimeSpan.FromMinutes(30)) return KlineInterval.ThirtyMinutes;
             if (timeSpan == TimeSpan.FromHours(1)) return KlineInterval.OneHour;
             if (timeSpan == TimeSpan.FromHours(2)) return KlineInterval.TwoHours;
@@ -342,11 +344,11 @@ namespace Kucoin.Net.Clients.SpotApi
             OnOrderCanceled?.Invoke(id);
         }
 
-        internal Task<WebCallResult> Execute(Uri uri, HttpMethod method, CancellationToken ct, Dictionary<string, object>? parameters = null, bool signed = false)
-         => _baseClient.Execute(this, uri, method, ct, parameters, signed);
+        internal Task<WebCallResult> Execute(Uri uri, HttpMethod method, CancellationToken ct, Dictionary<string, object>? parameters = null, bool signed = false, HttpMethodParameterPosition? parameterPosition = null)
+         => _baseClient.Execute(this, uri, method, ct, parameters, signed, parameterPosition: parameterPosition);
 
-        internal Task<WebCallResult<T>> Execute<T>(Uri uri, HttpMethod method, CancellationToken ct, Dictionary<string, object>? parameters = null, bool signed = false, int weight = 1, bool ignoreRatelimit = false)
-         => _baseClient.Execute<T>(this, uri, method, ct, parameters, signed, weight, ignoreRatelimit: ignoreRatelimit);
+        internal Task<WebCallResult<T>> Execute<T>(Uri uri, HttpMethod method, CancellationToken ct, Dictionary<string, object>? parameters = null, bool signed = false, int weight = 1, bool ignoreRatelimit = false, HttpMethodParameterPosition? parameterPosition = null)
+         => _baseClient.Execute<T>(this, uri, method, ct, parameters, signed, weight, ignoreRatelimit: ignoreRatelimit, parameterPosition: parameterPosition);
 
         internal Uri GetUri(string path, int apiVersion = 1)
         {
@@ -359,7 +361,7 @@ namespace Kucoin.Net.Clients.SpotApi
             => ExchangeData.GetServerTimeAsync();
 
         /// <inheritdoc />
-        protected override TimeSyncInfo GetTimeSyncInfo()
+        public override TimeSyncInfo GetTimeSyncInfo()
             => new TimeSyncInfo(_log, _options.SpotApiOptions.AutoTimestamp, _options.SpotApiOptions.TimestampRecalculationInterval, TimeSyncState);
 
         /// <inheritdoc />

@@ -84,7 +84,8 @@ namespace Kucoin.Net.Objects
         /// Default options for the spot client
         /// </summary>
         public static KucoinSocketClientOptions Default { get; set; } = new KucoinSocketClientOptions() {
-            SocketSubscriptionsCombineTarget = 10
+            SocketSubscriptionsCombineTarget = 10,
+            MaxSocketConnections = 50
         };
 
         /// <inheritdoc />
@@ -213,6 +214,11 @@ namespace Kucoin.Net.Objects
         /// The top amount of results to keep in sync. If for example limit=10 is used, the order book will contain the 10 best bids and 10 best asks. Leaving this null will sync the full order book
         /// </summary>
         public int? Limit { get; set; }
+
+        /// <summary>
+        /// After how much time we should consider the connection dropped if no data is received for this time after the initial subscriptions
+        /// </summary>
+        public TimeSpan? InitialDataTimeout { get; set; }
 
         /// <summary>
         /// The client to use for the socket connection. When using the same client for multiple order books the connection can be shared.
